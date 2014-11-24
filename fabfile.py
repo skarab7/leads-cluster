@@ -85,42 +85,6 @@ def create_cluster():
     _generate_private_ips_file(n_and_ips)
 
 
-def _generate_ssh_config(nodes):
-    """
-    """
-    ssh_gateway = os_url.split(":")[1].replace("/", "").replace('identity', 'ssh').replace('-', '.')
-
-    template = """
-Host {0}
-    Hostname {1}
-    ProxyCommand ssh forward@{2} nc -q0 %h %p
-    Port 22
-    User ubuntu
-    """
-
-    cluster_ssh_config = ""
-    for n in nodes:
-        entry = template.format(n[0].name, n[0].private_ips[0], ssh_gateway)
-        cluster_ssh_config = cluster_ssh_config + entry + "\n"
-
-    with open("cluster_ssh_config", 'w') as f:
-        f.write(cluster_ssh_config)
-        f.write("\n")
-    return "./cluster_ssh_config"
-
-
-def _generate_host_file(n_and_ips):
-    c_hosts = [n[0].name for n in n_and_ips]
-    with open("cluster_hosts", 'w') as f:
-        f.write(",".join(c_hosts))
-
-
-def _generate_private_ips_file(n_and_ips):
-    private_ips = [n[0].private_ips[0] for n in n_and_ips]
-    with open("cluster_private_ips", 'w') as f:
-        f.write(",".join(private_ips))
-
-
 def _create_external_access_sg(sec_group_name):
     sg = _find_sg_by_name(sec_group_name)
     if not sg:
@@ -229,6 +193,42 @@ ssh_authorized_keys:"""
     for sk in ssh_keys:
         cloud_init_content = cloud_init_content + "\n  - " + sk
     return cloud_init_content
+
+
+def _generate_ssh_config(nodes):
+    """
+    """
+    ssh_gateway = os_url.split(":")[1].replace("/", "").replace('identity', 'ssh').replace('-', '.')
+
+    template = """
+Host {0}
+    Hostname {1}
+    ProxyCommand ssh forward@{2} nc -q0 %h %p
+    Port 22
+    User ubuntu
+    """
+
+    cluster_ssh_config = ""
+    for n in nodes:
+        entry = template.format(n[0].name, n[0].private_ips[0], ssh_gateway)
+        cluster_ssh_config = cluster_ssh_config + entry + "\n"
+
+    with open("cluster_ssh_config", 'w') as f:
+        f.write(cluster_ssh_config)
+        f.write("\n")
+    return "./cluster_ssh_config"
+
+
+def _generate_host_file(n_and_ips):
+    c_hosts = [n[0].name for n in n_and_ips]
+    with open("cluster_hosts", 'w') as f:
+        f.write(",".join(c_hosts))
+
+
+def _generate_private_ips_file(n_and_ips):
+    private_ips = [n[0].private_ips[0] for n in n_and_ips]
+    with open("cluster_private_ips", 'w') as f:
+        f.write(",".join(private_ips))
 
 
 @parallel

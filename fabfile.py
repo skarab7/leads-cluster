@@ -345,8 +345,9 @@ def install_hadoop():
     if not exists(dir_name):
         run("tar zxvf {0}".format(pkg_file_name))
 
-    crawler_home = "/home/ubuntu/{0}".format(dir_name)
-    _hadoop_heap_configure(crawler_home)
+    hadoop_home = "/home/ubuntu/{0}".format(dir_name)
+    _hadoop_heap_configure(hadoop_home)
+    _hadoop_change_map_red_site(hadoop_home, hadoop_master_node)
 
 
 # fabric roles works only on env.host
@@ -364,15 +365,35 @@ def roles_host_string_based(*args):
     return new_decorator
 
 
-@roles_host_string_based('masters')
-def _hadoop_heap_configure(crawler_home, new_heap_size=1000, old_heap_size=2000):
+@roles_host_string_based('masters', 'slaves')
+def _hadoop_heap_configure(hadoop_home, new_heap_size=1000, old_heap_size=2000):
     """
     Le Quoc Do - SE Group TU Dresden contribution
     """
-    filename = crawler_home + '/etc/hadoop/hadoop-env.sh'
+    filename = hadoop_home + '/etc/hadoop/hadoop-env.sh'
     before = 'HADOOP_HEAPSIZE=' + str(new_heap_size)
     after = 'HADOOP_HEAPSIZE=' + str(old_heap_size)
     files.sed(filename, before, after, limit='')
     files.uncomment(filename, 'HADOOP_HEAPSIZE')
+
+
+@roles_host_string_based('masters', 'slaves')
+def _hadoop_change_map_red_site(hadoop_home, master, map_task='8', reduce_task='6'):
+    """
+    Le Quoc Do - SE Group TU Dresden contribution
+    """
+    before = '<configuration>'
+    after = '<configuration>'\
+            '\\n<property>\\n<name>mapred.job.tracker</name>\\n<value>' + master + ':9001</value>\\n</property>'\
+            '\\n<property>\\n<name>mapred.map.tasks</name>\\n<value>' + map_task + '</value>\\n</property>'\
+            '\\n<property>\\n<name>mapred.reduce.tasks</name>\\n<value>' + reduce_task + '</value>\\n</property>'\
+            '\\n<property>\\n<name>mapred.system.dir</name>\\n<value>' + hadoop_home + '/hdfs/mapreduce/system</value>\\n</property>'\
+            '\\n<property>\\n<name>mapred.local.dir</name>\\n<value>' + hadoop_home + '/hdfs/mapreduce/local</value>\\n'\
+            '</property>'
+
+    with cd(hadoop_home + '/etc/hadoop/'):
+        run('cp mapred-site.xml.template mapred-site.xml')
+        filename = 'mapred-site.xml'
+        files.sed(filename, before, after, limit='')
 
 

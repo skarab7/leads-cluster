@@ -1,0 +1,6 @@
+README.pdf
+*.pyc
+cluster_ssh_config
+cluster_hosts
+cluster_private_ips
+tmp_*

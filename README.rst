@@ -1,48 +1,189 @@
 LEADS cluster
 ==================
 
-This project is based on: https://github.com/otrack/Leads-deployment.git. The project created and maintained by Pierre Sutra.
+The project goal is to provide an easy way to setup a cluster for FP7 EU LEADS project (http://www.leads-project.eu). 
 
+This project is based on: https://github.com/otrack/Leads-deployment.git. A project created and maintained by Pierre Sutra.
+
+**Main git repo is https://github.com/skarab7/leads-cluster.git.**
 
 Scenario
 --------------
 
 Structure: The name of a scenario and the corresponding version of the leads-cluster:
 
-- Infinispan setup (0.1.0)
+- leads-cluster setup (1.0.0)
 
-::
+  N-node cluster in one Cloud&Heat cloud
 
-   ----        ----                  ----        ---- 
-  | L1 |  <-> | L1 |    <-------->  | L3 |  <-> | L4 | 
-   ----        ----                  ----        ----
-  ------------------                ------------------
- |    deployment    |              |    deployment    |
- |         A        |              |         B        |
-  ------------------                ------------------
+  ::
+
+     ----        ----      
+    | L1 |  <-> | L2 |    
+     ----        ----     
+    ------------------     
+   |    deployment    |
+   |         A        |
+    ------------------ 
+
+ 
+- Hadoop (1.1.0) 
+
+  Install Hadoop
+
+- Nutch (1.2.0)
+
+  Install Nutch
+
+- Infinispan setup (2.0.0)
+ 
+  Cross deployment (microclouds) deployment
+
+  ::
   
- 
-- Hadoop (0.2.0) 
-  
+     ----        ----                  ----        ---- 
+    | L1 |  <-> | L2 |    <-------->  | L3 |  <-> | L4 | 
+     ----        ----                  ----        ----
+    ------------------                ------------------
+   |    deployment    |              |    deployment    |
+   |         A        |              |         B        |
+    ------------------                ------------------
 
-
-- Nutch (0.3.0)
- 
- 
 How to use it
 -----------------
 
-*Makefile* contains the most commonly used commands for this software.
+*Makefile* is the entry point for this project.
 
-What
---------------------
-
+Workflow
+~~~~~~~~~~~
 
 :: 
 
-  [ Create VMs, tagged ] -> | Create Security Group if missing | ->  [start machines] 
+  [ Create VMs, tagged ] -> [ Create Security Group if missing ] ->  [start machines] 
 
     -> [install LEADS from container] -> [configure] -> [start services]
+
+Tasks
+~~~~~~~~~~~~~~~
+
+Please use virutalenv and virtualenvwrapper to manage your python libraries.
+
+1. Init the virutalenv
+
+  ::
+
+    make init_virtualenv
+    workon leads-cluster
+
+  **You need to enable virtualenv to run all tasks described below.**
+
+2. Create cluster
+   
+  This task will create nodes only if nodes do not exist. It is idempotent.  
+ 
+  .. code:: bash
+
+    # you need to load your openrc 
+    source openrc
+
+    # specify number of nodes:
+    export LEADS_CLUSTER_NUM_OF_NODES=2
+
+    # you need to specify ssh-pair that you want to use
+    # to setup LEADS nodes through ssh
+    export LEADS_CLUSTER_PRIMARY_SSH_KEY=ssh-pair-name
+
+    # list of secondary ssh-key that are injected to the node
+    # thought clout-init script
+    export LEADS_CLUSTER_ADD_SSH_KEYS="ssh-rsa AAA...,ssh-rsa AAA..."
+    # 
+    make cluster_create
+
+
+  Optional options through environment variables:
+
+    - LEADS_CLUSTER_NAME, default value: leads_m24_cluster
+
+  This task also generates the following files:
+
+    - cluster_hosts - host names of nodes in the cluster
+    - cluster_private_ips - private ips of nodes in the cluster
+    - cluster_ssh_config - ssh config, so you can easily to connect to them with ssh:
+    
+      .. code:: bash
+
+        ssh leads_m24_cluster_node_0 -F cluster_ssh_config
+
+
+3. Install infinispan
+   
+   This script requires *cluster_hosts*, *cluster_private_ips*, and *cluster_ssh_config*. So, you need to run the previous step.
+
+  .. code:: bash
+  
+    make cluster_install_infinispan
+
+ 4. Start infinispan 
+ 
+ In parallel, the infinispan service is stopped on all the cluster nodes
+
+  .. code:: bash
+  
+    make cluster_start_infinispan
+
+ 5. Stop infinispan 
+ 
+ In parallel, the infinispan service is started on all the cluster nodes
+     
+  .. code:: bash
+
+     make cluster_stop_infinispan
+
+ 6. Deploying new infinispan archive
+    
+  The infinispan, that we installed, is download from an *URL* (currently hard-coded in fabric.py). Below, you will find instruction 
+  how to deploy new version of infinispan to swift container and generate a *URL* to access it during installation.
+
+  1. Upload infinispan-server-7.0.1-SNAPSHOT.tgz to *infinispan* container.
+     
+     .. code:: bash
+
+        # openrc of the microcloud with the *infinispan* container (see Makefile for the default)
+     	source openrc
+     	swift upload infinispan infinispan-server-7.0.1-SNAPSHOT.tgz
+
+     You can also use a tool with nice UI, such as: cyberduck.
+   
+  2. Generate temp-url to access infinispan-server-7.0.1-SNAPSHOT.tgz without password (so called *temp-url*)
+
+    .. code:: bash
+  
+      export OS_USERNAME=...
+      export OS_PASSWORD=...
+
+      # select the current the temp-key 
+      export MY_SECRET_KEY=$(swift stat | grep Temp-Url | cut -d":" -f2 | tr -d ' ')
+      # or or generate new one
+      export MY_SECRET_KEY=$(openssl rand -hex 32)
+
+      make swift_repo_get_temp_url_infinispan_package SWIFT_TEMPURL_KEY=${MY_SECRET_KEY}
+     
+  3. Modify *infinispan_package_url* in fabric.py
+     
+     .. code:: python
+
+       infinispan_package_url='https://object-hamm5.cloudandheat.com:8080/'\
+                              'v1/AU...
+
+
+Weapon of choice
+~~~~~~~~~~~~~~~~~
+
+- fabric - most familiar to project partners
+- cloud-init scripts / docker to create software artifacts early in the process
+
+Notes
+--------------------
 
 Requirements:
 
@@ -52,35 +193,14 @@ Requirements:
  
 - configuring *Infinispan* (overwriting), spawning manually new instances, connecting them (?)
 
-- quick patch process:
-
- - quick-line for updating target running instance
-
-- discover all running instances with type based on instance metadata
+- the cluster nodes should discover other nodes
 
 
-Development 
-----------------
+Resources
+-------------
 
-Setup
-~~~~~~~~~
+- Cloud&Heat Cloud manuals: https://www.cloudandheat.com/en/support.html
 
-Recommended way: virutalenv + virtualenvwrapper.
-
-1. Init the virutalenv
-
-::
-
-  make init_virtualenv
-  workon leads-cluster
-
-
-
-Weapon of choice
-~~~~~~~~~~~~~~~~~
-
-- fabric
-- cloud-init scripts / docker to create software artifacts early in the process
   
 
 

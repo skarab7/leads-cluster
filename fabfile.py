@@ -3,6 +3,7 @@ from fabric.contrib import files
 from fabric.api import run, env, sudo, local, cd, settings
 from fabric.api import hide, parallel, roles, hosts, serial
 from fabric.context_managers import shell_env
+from fabric.utils import error
 import os
 
 from libcloud.compute.types import Provider
@@ -363,14 +364,25 @@ def _get_hadoop_name(url):
 
 
 def _hadoop_configure(hadoop_home):
+    hadoop_master_priv_ip = get_node_private_ip(hadoop_master_node)
     _hadoop_heap_configure(hadoop_home)
     _hadoop_change_map_red_site(hadoop_home, hadoop_master_node)
-    _hadoop_change_core_site(hadoop_home, hadoop_master_node)
+    _hadoop_change_core_site(hadoop_home, hadoop_master_priv_ip)
     _hadoop_change_yarn_site(hadoop_home, hadoop_master_node)
     _hadoop_change_HDFS_site(hadoop_home, hadoop_master_node)
     _hadoop_change_masters(hadoop_home, hadoop_master_node)
     _hadoop_change_slaves(hadoop_home, env.roledefs['slaves'])
     _hadoop_prepare_etc_host()
+
+
+def get_node_private_ip(node_name):
+    ns = _find_node_by_name(cluster_name, node_name)
+
+    if not ns:
+        error("No node is running with name {0}!".format(node_name))
+    else:
+        node = ns[0]
+        return node.private_ips[0]
 
 
 # fabric roles works only on env.host
@@ -403,7 +415,7 @@ def _hadoop_heap_configure(hadoop_home, new_heap_size=1000, old_heap_size=2000):
 @roles_host_string_based('masters', 'slaves')
 def _hadoop_change_map_red_site(hadoop_home, master, map_task='8', reduce_task='6'):
     """
-    Le Quoc Do - SE Group TU Dresden contribution
+    Based on input from Le Quoc Do - SE Group TU Dresden contribution
     """
     before = '<configuration>'
     after = """
@@ -437,21 +449,20 @@ def _hadoop_change_map_red_site(hadoop_home, master, map_task='8', reduce_task='
         <name>mapreduce.framework.name</name>
         <value>yarn</value>
     </property>
-    """.format(master, map_task, reduce_task,  hadoop_home).replace("\n", "\\n")
+    """.format(master, map_task, reduce_task,  hadoop_home)
 
     with cd(hadoop_home + '/etc/hadoop/'):
         run('cp mapred-site.xml.template mapred-site.xml')
         filename = 'mapred-site.xml'
-        files.sed(filename, before, after, limit='')
+        files.sed(filename, before, after.replace("\n", "\\n"), limit='')
 
 
 @roles_host_string_based('masters', 'slaves')
-def _hadoop_change_core_site(hadoop_home, master):
+def _hadoop_change_core_site(hadoop_home, master_ip):
     """
-    Le Quoc Do - SE Group TU Dresden contribution
+    Based on input from Le Quoc Do - SE Group TU Dresden contribution
     """
-    before = '<configuration>'
-    after = """
+    content = """
 <configuration>
     <property>
         <name>hadoop.tmp.dir</name>
@@ -461,43 +472,63 @@ def _hadoop_change_core_site(hadoop_home, master):
         <name>fs.defaultFS</name>
         <value>hdfs://{1}:9000</value>
     </property>
-    """.format(hadoop_home, master).replace("\n", "\\n")
+</configuration>""".format(hadoop_home, master_ip)
 
     filename = 'core-site.xml'
     with cd(hadoop_home + '/etc/hadoop/'):
-        files.sed(filename, before, after, limit='')
+        run("rm -f {0}; touch {0}".format(filename))
+        files.append(filename, content)
 
 
 @roles_host_string_based('masters', 'slaves')
 def _hadoop_change_yarn_site(hadoop_home, master):
     filename = 'yarn-site.xml'
 
-    before = '<configuration>'
-    after = """
+    content = """
 <configuration>
     <property>
         <name>yarn.nodemanager.aux-services</name>
         <value>mapreduce_shuffle</value>
-    </property>""".replace("\n", "\\n")
+    </property>
+</configuration>"""
 
     with cd(hadoop_home + '/etc/hadoop/'):
-        files.sed(filename, before, after, limit='')
+        run("rm -f {0}; touch {0}".format(filename))
+        files.append(filename, content)
 
 
 @roles_host_string_based('masters', 'slaves')
 def _hadoop_change_HDFS_site(hadoop_home, master, replica='1', xcieversmax='10096'):
     """
-    Le Quoc Do - SE Group TU Dresden contribution
+    Based on input from Le Quoc Do - SE Group TU Dresden contribution
     """
     filename = 'hdfs-site.xml'
-    before = '<configuration>'
-    after = '<configuration>' + '\\n<property>\\n<name>dfs.name.dir</name>\\n<value>' + hadoop_home + '/hdfs/name</value>\\n</property>'\
-                                '\\n<property>\\n<name>dfs.data.dir</name>\\n<value>' + hadoop_home + '/hdfs/data</value>\\n</property>'\
-                                '\\n<property>\\n<name>dfs.replication</name>\\n<value>' + replica + '</value>\\n</property>'\
-                                '\\n<property>\\n<name>dfs.datanode.max.xcievers</name>'\
-                                '\\n<value>' + xcieversmax + '</value>\\n</property>'
+    content = """
+<configuration>
+    <property>
+        <name>dfs.name.dir</name>
+        <value>{0}/hdfs/name</value>
+    </property>
+    <property>
+        <name>dfs.data.dir</name>
+        <value>{0}/hdfs/data</value>
+    </property>
+
+    <property>
+        <name>dfs.replication</name>
+        <value>{1}</value>
+    </property>
+
+    <property>
+        <name>dfs.datanode.max.xcievers</name>
+        <value>{2}</value>
+    </property>
+</configuration>
+""".format(hadoop_home, replica,  xcieversmax)
+
     with cd(hadoop_home + '/etc/hadoop/'):
-        files.sed(filename, before, after, limit='')
+        run("rm -f {0}; touch {0}".format(filename))
+        files.append(filename, content)
 
 
 @roles_host_string_based('masters', 'slaves')

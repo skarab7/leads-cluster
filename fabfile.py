@@ -26,6 +26,11 @@ def _get_env_array(env_name, default_value, delimiter):
     else:
         return env_value.split(delimiter)
 
+
+def _get_node_name(node_name_prefix, node_id):
+    return node_name_prefix + "-" + str(node_id)
+
+
 env.forward_agent = True
 env.use_ssh_config = True
 
@@ -35,7 +40,7 @@ os_password = os.environ["OS_PASSWORD"]
 os_url = os.environ["OS_AUTH_URL"]+"/tokens"
 
 cluster_num_of_nodes = int(os.environ["LEADS_CLUSTER_NUM_OF_NODES"])
-cluster_name = _get_env_value("LEADS_CLUSTER_NAME", "leads_m24_cluster")
+cluster_name = _get_env_value("LEADS_CLUSTER_NAME", "leads-m24-cluster")
 
 cluster_security_group_name = cluster_name + "_internal"
 
@@ -54,7 +59,7 @@ cluster_primary_ssh_key = _get_env_value("LEADS_CLUSTER_PRIMARY_SSH_KEY", "wb-ne
 # otherwise you can
 cluster_additinal_ssh_keys = _get_env_array("LEADS_CLUSTER_ADD_SSH_KEYS", [], ',')
 
-node_name_prefix = cluster_name + "_node"
+node_name_prefix = cluster_name + "-node"
 node_flavor = "cloudcompute.s"
 image_name = "Ubuntu 14.04 LTS x64"
 node_metadata = {"leads_cluster_name":  cluster_name}
@@ -67,9 +72,9 @@ infinispan_package_url = 'https://object-hamm5.cloudandheat.com:8080/'\
 hadoop_package_url = 'https://archive.apache.org/dist/hadoop/core/hadoop-2.5.2/hadoop-2.5.2.tar.gz'
 
 hadoop_master_node_id = _get_env_value("LEADS_CLUSTER_HADOOP_MASTER_NODE_ID", 0)
-hadoop_master_node = node_name_prefix + "_" + str(hadoop_master_node_id)
+hadoop_master_node = _get_node_name(node_name_prefix, str(hadoop_master_node_id))
 hadoop_slave_node_ids = _get_env_array("LEADS_CLUSTER_HADOOP_SLAVE_NODE_IDS", [1], ",")
-hadoop_slave_nodes = [node_name_prefix + "_" + str(s) for s in hadoop_slave_node_ids]
+hadoop_slave_nodes = [_get_node_name(node_name_prefix, s) for s in hadoop_slave_node_ids]
 
 env.roledefs = {
     'masters': [hadoop_master_node],
@@ -94,7 +99,8 @@ def create_cluster():
     # create a VM
     nodes = []
     for i in range(0, cluster_num_of_nodes):
-        n = _create_instance(cluster_name, node_name_prefix + "_" + str(i), sec_groups)
+        node_name = _get_node_name(node_name_prefix, i)
+        n = _create_instance(cluster_name, node_name, sec_groups)
         nodes.append(n)
 
     n_and_ips = os_conn.wait_until_running(nodes)
@@ -507,7 +513,7 @@ def _hadoop_change_HDFS_site(hadoop_home, master, replica='1', xcieversmax='1009
 <configuration>
     <property>
         <name>dfs.name.dir</name>
-        <value>{0}/hdfs/name</value>
+        <value>file://{0}/hdfs/name</value>
     </property>
     <property>
         <name>dfs.data.dir</name>

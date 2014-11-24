@@ -196,6 +196,11 @@ Requirements:
 - the cluster nodes should discover other nodes
 
 
+Resources
+-------------
+
+- Cloud&Heat Cloud manuals: https://www.cloudandheat.com/en/support.html
+
   
 
 

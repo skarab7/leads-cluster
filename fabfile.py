@@ -1,4 +1,4 @@
-from fabric.contrib.files import exists
+from fabric.contrib.files import exists, append, contains
 from fabric.api import run, env, sudo, local, cd
 from fabric.api import hide, parallel
 import os
@@ -310,19 +310,25 @@ def start_infinispan_service():
 @parallel
 def stop_infinispan_service():
     sudo("sudo service infinispan-server stop", pty=True)
-    
+
+
+@parallel
+def deploy_additioanl_ssh_keys():
+    authorized_file = "~/.ssh/authorized_keys"
+    for k in cluster_additinal_ssh_keys:
+        if not contains(authorized_file, k.strip()):
+            append(authorized_file, "\n")
+            append(authorized_file, k)
+
+
 @parallel
 def install_hadoop():
     """
     """
     pkg_file_name = hadoop_package_url.split("/")[-1]
-    dir_name = pkg_file_name[:-len('.tar.gz')]    
+    dir_name = pkg_file_name[:-len('.tar.gz')]
 
     if not exists(pkg_file_name):
         run("wget '{0}' -O {1}".format(hadoop_package_url, pkg_file_name))
     if not exists(dir_name):
         run("tar zxvf {0}".format(pkg_file_name))
-     
-        
-        
-    

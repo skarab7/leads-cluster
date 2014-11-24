@@ -175,6 +175,12 @@ Please use virutalenv and virtualenvwrapper to manage your python libraries.
        infinispan_package_url='https://object-hamm5.cloudandheat.com:8080/'\
                               'v1/AU...
 
+ 7. Importing new ssh_keys to the running nodes
+
+  .. code:: bash
+
+    export LEADS_CLUSTER_ADD_SSH_KEYS="$(<id_rsa.pub)"
+    make deploy_additional_keys
 
 Weapon of choice
 ~~~~~~~~~~~~~~~~~

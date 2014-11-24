@@ -148,7 +148,15 @@ Please use virutalenv and virtualenvwrapper to manage your python libraries.
   In the next versions, we will move it to separate nodes. We also introduce a separate *resource manager*.
 
   .. code:: bash
+
+    # you can specify which node should be the hadoop master
+    # default is 0
+    export LEADS_CLUSTER_HADOOP_MASTER_NODE_ID=0 
      
+    # you can specif which nodes are slaves
+    # default is 1
+    export LEADS_CLUSTER_HADOOP_SLAVE_NODE_IDS=1
+
     make cluster_install_hadoop
 
 7. Start hadoop
@@ -191,7 +199,7 @@ Helpers
 
       # select the current the temp-key 
       export MY_SECRET_KEY=$(swift stat | grep Temp-Url | cut -d":" -f2 | tr -d ' ')
-      # or or generate new one
+      # or generate new one
       export MY_SECRET_KEY=$(openssl rand -hex 32)
 
       make swift_repo_get_temp_url_infinispan_package SWIFT_TEMPURL_KEY=${MY_SECRET_KEY}

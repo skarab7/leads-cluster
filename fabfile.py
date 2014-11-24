@@ -346,8 +346,16 @@ def install_hadoop():
         run("tar zxvf {0}".format(pkg_file_name))
 
     hadoop_home = "/home/ubuntu/{0}".format(dir_name)
+    _hadoop_configure(hadoop_home)
+
+
+def _hadoop_configure(hadoop_home):
     _hadoop_heap_configure(hadoop_home)
     _hadoop_change_map_red_site(hadoop_home, hadoop_master_node)
+    _hadoop_change_core_site(hadoop_home, hadoop_master_node)
+    _hadoop_change_HDFS_site(hadoop_home, hadoop_master_node)
+    _hadoop_change_masters(hadoop_home, hadoop_master_node)
+    _hadoop_change_slaves(hadoop_home, env.roledefs['slaves'])
 
 
 # fabric roles works only on env.host
@@ -397,3 +405,58 @@ def _hadoop_change_map_red_site(hadoop_home, master, map_task='8', reduce_task='
         files.sed(filename, before, after, limit='')
 
 
+@roles_host_string_based('masters', 'slaves')
+def _hadoop_change_core_site(hadoop_home, master):
+    """
+    Le Quoc Do - SE Group TU Dresden contribution
+    """
+    before = '<configuration>'
+    after = '<configuration>'\
+            '\\n<property>\\n<name>hadoop.tmp.dir</name>\\n<value>' + hadoop_home + '/hdfs</value>\\n</property>'\
+            '\\n<property>\\n<name>fs.default.name</name>'\
+            '\\n<value>hdfs://' + master + ':9000</value>\\n</property>'
+    filename = 'core-site.xml'
+    with cd(hadoop_home + '/etc/hadoop/'):
+        files.sed(filename, before, after, limit='')
+
+
+@roles_host_string_based('masters', 'slaves')
+def _hadoop_change_HDFS_site(hadoop_home, master, replica='1', xcieversmax='10096'):
+    """
+    Le Quoc Do - SE Group TU Dresden contribution
+    """
+    filename = 'hdfs-site.xml'
+    before = '<configuration>'
+    after = '<configuration>' + '\\n<property>\\n<name>dfs.name.dir</name>\\n<value>' + hadoop_home + '/hdfs/name</value>\\n</property>'\
+                                '\\n<property>\\n<name>dfs.data.dir</name>\\n<value>' + hadoop_home + '/hdfs/data</value>\\n</property>'\
+                                '\\n<property>\\n<name>dfs.replication</name>\\n<value>' + replica + '</value>\\n</property>'\
+                                '\\n<property>\\n<name>dfs.datanode.max.xcievers</name>'\
+                                '\\n<value>' + xcieversmax + '</value>\\n</property>'
+    with cd(hadoop_home + '/etc/hadoop/'):
+        files.sed(filename, before, after, limit='')
+
+
+@roles_host_string_based('masters', 'slaves')
+def _hadoop_change_masters(hadoop_home, master):
+    """
+    Le Quoc Do - SE Group TU Dresden contribution
+    """
+    filename = 'masters'
+
+    with cd(hadoop_home + '/etc/hadoop'):
+        run("rm -f masters; touch masters")
+        files.append(filename, master)
+
+
+@roles_host_string_based('masters', 'slaves')
+def _hadoop_change_slaves(hadoop_home, slaves):
+    """
+    Le Quoc Do - SE Group TU Dresden contribution
+    """
+    filename = 'slaves'
+    before = 'localhost'
+    after = ''
+    for slave in slaves:
+        after = after + slave + '\\n'
+    with cd(hadoop_home + '/etc/hadoop'):
+        files.sed(filename, before, after, limit='')

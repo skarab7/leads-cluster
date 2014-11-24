@@ -1,7 +1,7 @@
 from fabric.contrib.files import exists, append, contains
 from fabric.contrib import files
 from fabric.api import run, env, sudo, local, cd, settings
-from fabric.api import hide, parallel, roles, hosts
+from fabric.api import hide, parallel, roles, hosts, serial
 from fabric.context_managers import shell_env
 import os
 
@@ -40,7 +40,8 @@ cluster_security_group_name = cluster_name + "_internal"
 
 # infinispan - 54200 and 55200
 # hadoop - 9000 and 9001 and 50070 (NameNode) and 8088 (resourcemanager)
-cluster_port_communication = ['54200', '55200', '22', '9000', '9001', '50070', '8088']
+cluster_port_communication = ['54200', '55200', '22', '9000', '9001', '50070',
+                              '8088', '19888', '10020']
 
 cluster_external_access_sg_name = cluster_name + "_external_access"
 cluster_external_access_ports = ['22']
@@ -340,7 +341,7 @@ def deploy_additioanl_ssh_keys():
 def install_hadoop():
     """
     """
-    pkg_file_name = _get_hadoop_pkg_name(url)
+    pkg_file_name = _get_hadoop_pkg_name(hadoop_package_url)
     dir_name = _get_hadoop_name(hadoop_package_url)
 
     if not exists(pkg_file_name):
@@ -365,6 +366,7 @@ def _hadoop_configure(hadoop_home):
     _hadoop_heap_configure(hadoop_home)
     _hadoop_change_map_red_site(hadoop_home, hadoop_master_node)
     _hadoop_change_core_site(hadoop_home, hadoop_master_node)
+    _hadoop_change_yarn_site(hadoop_home, hadoop_master_node)
     _hadoop_change_HDFS_site(hadoop_home, hadoop_master_node)
     _hadoop_change_masters(hadoop_home, hadoop_master_node)
     _hadoop_change_slaves(hadoop_home, env.roledefs['slaves'])
@@ -404,13 +406,38 @@ def _hadoop_change_map_red_site(hadoop_home, master, map_task='8', reduce_task='
     Le Quoc Do - SE Group TU Dresden contribution
     """
     before = '<configuration>'
-    after = '<configuration>'\
-            '\\n<property>\\n<name>mapred.job.tracker</name>\\n<value>' + master + ':9001</value>\\n</property>'\
-            '\\n<property>\\n<name>mapred.map.tasks</name>\\n<value>' + map_task + '</value>\\n</property>'\
-            '\\n<property>\\n<name>mapred.reduce.tasks</name>\\n<value>' + reduce_task + '</value>\\n</property>'\
-            '\\n<property>\\n<name>mapred.system.dir</name>\\n<value>' + hadoop_home + '/hdfs/mapreduce/system</value>\\n</property>'\
-            '\\n<property>\\n<name>mapred.local.dir</name>\\n<value>' + hadoop_home + '/hdfs/mapreduce/local</value>\\n'\
-            '</property>'
+    after = """
+<configuration>
+    <property>
+        <name>mapred.job.tracker</name>
+        <value>{0}:9001</value>
+    </property>
+
+    <property>
+        <name>mapred.map.tasks</name>
+        <value>{1}</value>
+    </property>
+
+    <property>
+        <name>mapred.reduce.tasks</name>
+        <value>{2}</value>
+    </property>
+
+    <property>
+        <name>mapred.system.dir</name>
+        <value>{3}/hdfs/mapreduce/system</value>
+    </property>
+
+    <property>
+        <name>mapred.local.dir</name>
+        <value>{3}/hdfs/mapreduce/local</value>
+    </property>
+
+    <property>
+        <name>mapreduce.framework.name</name>
+        <value>yarn</value>
+    </property>
+    """.format(master, map_task, reduce_task,  hadoop_home).replace("\n", "\\n")
 
     with cd(hadoop_home + '/etc/hadoop/'):
         run('cp mapred-site.xml.template mapred-site.xml')
@@ -424,11 +451,35 @@ def _hadoop_change_core_site(hadoop_home, master):
     Le Quoc Do - SE Group TU Dresden contribution
     """
     before = '<configuration>'
-    after = '<configuration>'\
-            '\\n<property>\\n<name>hadoop.tmp.dir</name>\\n<value>' + hadoop_home + '/hdfs</value>\\n</property>'\
-            '\\n<property>\\n<name>fs.default.name</name>'\
-            '\\n<value>hdfs://' + master + ':9000</value>\\n</property>'
+    after = """
+<configuration>
+    <property>
+        <name>hadoop.tmp.dir</name>
+        <value>{0}/hdfs</value>
+    </property>
+    <property>
+        <name>fs.defaultFS</name>
+        <value>hdfs://{1}:9000</value>
+    </property>
+    """.format(hadoop_home, master).replace("\n", "\\n")
+
     filename = 'core-site.xml'
+    with cd(hadoop_home + '/etc/hadoop/'):
+        files.sed(filename, before, after, limit='')
+
+
+@roles_host_string_based('masters', 'slaves')
+def _hadoop_change_yarn_site(hadoop_home, master):
+    filename = 'yarn-site.xml'
+
+    before = '<configuration>'
+    after = """
+<configuration>
+    <property>
+        <name>yarn.nodemanager.aux-services</name>
+        <value>mapreduce_shuffle</value>
+    </property>""".replace("\n", "\\n")
+
     with cd(hadoop_home + '/etc/hadoop/'):
         files.sed(filename, before, after, limit='')
 
@@ -503,24 +554,63 @@ def _get_hadoop_home():
     return "/home/ubuntu/{0}".format(_get_hadoop_name(hadoop_package_url))
 
 
+@serial
 def start_hadoop_service():
     """
     Hadoop: start service
     """
-    _command_hadoop_service("start")
+    _hadoop_command_namenode("start")
+    _hadoop_command_datanode("start")
+    _hadoop_command_resource_mgmt("start")
+    _hadoop_command_node_manager("start")
 
 
-def _command_hadoop_service(action):
+def _command_hadoop_service(command):
     hadoop_home = _get_hadoop_home()
     with cd(hadoop_home):
-        with shell_env(JAVA_HOME='/usr/lib/jvm/java-7-openjdk-amd64',
-                       HADOOP_PREFIX=hadoop_home):
-            run("./sbin/{0}-dfs.sh".format(action))
             run("./sbin/{0}-yarn.sh".format(action))
 
 
+@roles_host_string_based('masters')
+def _hadoop_command_namenode(action):
+    _execute_hadoop_command('$HADOOP_PREFIX/sbin/hadoop-daemon.sh --config $HADOOP_CONF_DIR'
+                            ' --script hdfs ' + action + ' namenode')
+
+
+def _execute_hadoop_command(cmd):
+    hadoop_home = _get_hadoop_home()
+
+    with shell_env(JAVA_HOME='/usr/lib/jvm/java-7-openjdk-amd64',
+                   HADOOP_PREFIX=hadoop_home,
+                   HADOOP_CONF_DIR=hadoop_home + "/etc/hadoop",
+                   HADOOP_YARN_HOME=hadoop_home):
+        run(cmd)
+
+
+@roles_host_string_based('masters')
+def _hadoop_command_datanode(action):
+    _execute_hadoop_command('$HADOOP_PREFIX/sbin/hadoop-daemon.sh --config $HADOOP_CONF_DIR'
+                            ' --script hdfs ' + action + ' datanode')
+
+
+@roles_host_string_based('masters')
+def _hadoop_command_resource_mgmt(action):
+    _execute_hadoop_command('$HADOOP_YARN_HOME/sbin/yarn-daemon.sh'
+                            ' --config $HADOOP_CONF_DIR ' + action + ' resourcemanager')
+
+
+@roles_host_string_based('masters', 'slaves')
+def _hadoop_command_node_manager(action):
+    _execute_hadoop_command('$HADOOP_YARN_HOME/sbin/yarn-daemon.sh'
+                            ' --config $HADOOP_CONF_DIR ' + action + ' nodemanager')
+
+
+@serial
 def stop_hadoop_service():
     """
     Hadoop: stop service
     """
-    _command_hadoop_service("stop")
+    _hadoop_command_namenode("stop")
+    _hadoop_command_datanode("stop")
+    _hadoop_command_resource_mgmt("stop")
+    _hadoop_command_node_manager("stop")

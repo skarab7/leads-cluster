@@ -356,6 +356,7 @@ def _hadoop_configure(hadoop_home):
     _hadoop_change_HDFS_site(hadoop_home, hadoop_master_node)
     _hadoop_change_masters(hadoop_home, hadoop_master_node)
     _hadoop_change_slaves(hadoop_home, env.roledefs['slaves'])
+    _hadoop_prepare_etc_host()
 
 
 # fabric roles works only on env.host
@@ -460,3 +461,26 @@ def _hadoop_change_slaves(hadoop_home, slaves):
         after = after + slave + '\\n'
     with cd(hadoop_home + '/etc/hadoop'):
         files.sed(filename, before, after, limit='')
+
+
+@roles_host_string_based('masters', 'slaves')
+def _hadoop_prepare_etc_host():
+    print "xx"
+    with open('cluster_hosts', 'r') as f:
+        c_hostnames = f.read().split(',')
+    with open('cluster_private_ips', 'r') as f:
+        c_priv_ips = f.read().split(',')
+
+    print c_hostnames
+    print len(c_hostnames)
+    for i in range(0, len(c_hostnames)):
+        entry = c_priv_ips[i] + " " + c_hostnames[i]
+        if not files.contains('/etc/hosts', entry):
+            files.append('/etc/hosts', entry, use_sudo=True)
+
+
+def start_hadoop_service():
+    hadoop_home = "/home/ubuntu/{0}".format("hadoop-2.5.2")
+    with cd(hadoop_home):
+        run("export JAVA_HOME='/usr/lib/jvm/java-7-openjdk-amd64'; ./sbin/start-dfs.sh")
+        run("export JAVA_HOME='/usr/lib/jvm/java-7-openjdk-amd64'; ./sbin/start-yarn.sh")

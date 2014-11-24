@@ -33,6 +33,15 @@ cluster_start_infinispan:
 cluster_stop_infinispan:
 	fab -H $$(<cluster_hosts) stop_infinispan_service --ssh-config-path=$(_SSH_CONFIG_FILE)	
 
+cluster_install_hadoop:
+	fab -H $$(<cluster_hosts) install_hadoop --ssh-config-path=cluster_ssh_config
+
+cluster_start_hadoop:
+	fab -H $$(<cluster_hosts) start_hadoop_service  --ssh-config-path=cluster_ssh_config
+
+cluster_stop_hadoop:
+	fab -H $$(<cluster_hosts) stop_hadoop_service  --ssh-config-path=cluster_ssh_config
+
 # export LEADS_CLUSTER_ADD_SSH_KEYS="$(<id_rsa.pub)"
 deploy_additional_keys:
 	if [ -z $${LEADS_CLUSTER_ADD_SSH_KEYS} ]; then echo "The environment variable LEADS_CLUSTER_ADD_SSH_KEYS must be set"; exit 1; fi; \

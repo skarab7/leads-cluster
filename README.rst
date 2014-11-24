@@ -117,29 +117,57 @@ Please use virutalenv and virtualenvwrapper to manage your python libraries.
 
 3. Install infinispan
    
-   This script requires *cluster_hosts*, *cluster_private_ips*, and *cluster_ssh_config*. So, you need to run the previous step.
+  This script requires *cluster_hosts*, *cluster_private_ips*, and *cluster_ssh_config*. So, you need to run the previous step.
 
   .. code:: bash
   
     make cluster_install_infinispan
 
- 4. Start infinispan 
+4. Start infinispan 
  
- In parallel, the infinispan service is stopped on all the cluster nodes
+  In parallel, the infinispan service is stopped on all the cluster nodes
 
   .. code:: bash
   
     make cluster_start_infinispan
 
- 5. Stop infinispan 
+5. Stop infinispan 
  
- In parallel, the infinispan service is started on all the cluster nodes
+  In parallel, the infinispan service is started on all the cluster nodes
      
   .. code:: bash
 
-     make cluster_stop_infinispan
+    make cluster_stop_infinispan
 
- 6. Deploying new infinispan archive
+
+6. Install hadoop
+  
+  In the current version, hadoop is installed on the same nodes as infinispan. 
+  We distringuish: master (running: *namenode*, *datanode*, *resource manager*, *node manager*) and slave (*node manager*).
+
+  In the next versions, we will move it to separate nodes. We also introduce a separate *resource manager*.
+
+  .. code:: bash
+     
+    make cluster_install_hadoop
+
+7. Start hadoop
+   
+  .. code:: bash
+     
+    make cluster_start_hadoop
+
+8. Stop hadoop
+   
+  .. code:: bash
+     
+    make cluster_stop_hadoop
+
+
+Helpers
+~~~~~~~~~~~~~~~
+
+1. Deploying new infinispan archive
     
   The infinispan, that we installed, is download from an *URL* (currently hard-coded in fabric.py). Below, you will find instruction 
   how to deploy new version of infinispan to swift container and generate a *URL* to access it during installation.
@@ -175,7 +203,7 @@ Please use virutalenv and virtualenvwrapper to manage your python libraries.
        infinispan_package_url='https://object-hamm5.cloudandheat.com:8080/'\
                               'v1/AU...
 
- 7. Importing new ssh_keys to the running nodes
+ 2. Importing new ssh_keys to the running nodes
 
   .. code:: bash
 

@@ -1,9 +1,9 @@
 from fabric.contrib.files import exists, append, contains
 from fabric.contrib import files
-from fabric.api import run, env, sudo, local, cd
+from fabric.api import run, env, sudo, local, cd, settings
 from fabric.api import hide, parallel, roles, hosts
+from fabric.context_managers import shell_env
 import os
-from pipes import quote
 
 from libcloud.compute.types import Provider
 from libcloud.compute.providers import get_driver
@@ -37,7 +37,10 @@ cluster_num_of_nodes = int(os.environ["LEADS_CLUSTER_NUM_OF_NODES"])
 cluster_name = _get_env_value("LEADS_CLUSTER_NAME", "leads_m24_cluster")
 
 cluster_security_group_name = cluster_name + "_internal"
-cluster_port_communication = ['54200', '55200', '22']
+
+# infinispan - 54200 and 55200
+# hadoop - 9000 and 9001 and 50070 (NameNode) and 8088 (resourcemanager)
+cluster_port_communication = ['54200', '55200', '22', '9000', '9001', '50070', '8088']
 
 cluster_external_access_sg_name = cluster_name + "_external_access"
 cluster_external_access_ports = ['22']
@@ -337,8 +340,8 @@ def deploy_additioanl_ssh_keys():
 def install_hadoop():
     """
     """
-    pkg_file_name = hadoop_package_url.split("/")[-1]
-    dir_name = pkg_file_name[:-len('.tar.gz')]
+    pkg_file_name = _get_hadoop_pkg_name(url)
+    dir_name = _get_hadoop_name(hadoop_package_url)
 
     if not exists(pkg_file_name):
         run("wget '{0}' -O {1}".format(hadoop_package_url, pkg_file_name))
@@ -347,6 +350,15 @@ def install_hadoop():
 
     hadoop_home = "/home/ubuntu/{0}".format(dir_name)
     _hadoop_configure(hadoop_home)
+
+
+def _get_hadoop_pkg_name(url):
+    return url.split("/")[-1]
+
+
+def _get_hadoop_name(url):
+    pkg_file_name = _get_hadoop_pkg_name(url)
+    return pkg_file_name[:-len('.tar.gz')]
 
 
 def _hadoop_configure(hadoop_home):
@@ -465,22 +477,50 @@ def _hadoop_change_slaves(hadoop_home, slaves):
 
 @roles_host_string_based('masters', 'slaves')
 def _hadoop_prepare_etc_host():
-    print "xx"
     with open('cluster_hosts', 'r') as f:
         c_hostnames = f.read().split(',')
     with open('cluster_private_ips', 'r') as f:
         c_priv_ips = f.read().split(',')
-
-    print c_hostnames
-    print len(c_hostnames)
     for i in range(0, len(c_hostnames)):
         entry = c_priv_ips[i] + " " + c_hostnames[i]
         if not files.contains('/etc/hosts', entry):
             files.append('/etc/hosts', entry, use_sudo=True)
 
 
+@roles('masters')
+def hadoop_format():
+    hadoop_home = _get_hadoop_home()
+
+    with settings(warn_only=True):
+        with cd(hadoop_home):
+            with shell_env(JAVA_HOME='/usr/lib/jvm/java-7-openjdk-amd64',
+                           HADOOP_PREFIX=hadoop_home):
+                run('echo "Y" | bin/hdfs namenode -format')
+                run('bin/hdfs datanode -regular')
+
+
+def _get_hadoop_home():
+    return "/home/ubuntu/{0}".format(_get_hadoop_name(hadoop_package_url))
+
+
 def start_hadoop_service():
-    hadoop_home = "/home/ubuntu/{0}".format("hadoop-2.5.2")
+    """
+    Hadoop: start service
+    """
+    _command_hadoop_service("start")
+
+
+def _command_hadoop_service(action):
+    hadoop_home = _get_hadoop_home()
     with cd(hadoop_home):
-        run("export JAVA_HOME='/usr/lib/jvm/java-7-openjdk-amd64'; ./sbin/start-dfs.sh")
-        run("export JAVA_HOME='/usr/lib/jvm/java-7-openjdk-amd64'; ./sbin/start-yarn.sh")
+        with shell_env(JAVA_HOME='/usr/lib/jvm/java-7-openjdk-amd64',
+                       HADOOP_PREFIX=hadoop_home):
+            run("./sbin/{0}-dfs.sh".format(action))
+            run("./sbin/{0}-yarn.sh".format(action))
+
+
+def stop_hadoop_service():
+    """
+    Hadoop: stop service
+    """
+    _command_hadoop_service("stop")

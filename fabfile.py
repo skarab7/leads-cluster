@@ -58,6 +58,7 @@ infinispan_package_url = 'https://object-hamm5.cloudandheat.com:8080/'\
                          'temp_url_sig=76fcfe3e623edea4642e443ba5ff04e076395b85&'\
                          'temp_url_expires=1419376046'
 
+hadoop_package_url = 'https://archive.apache.org/dist/hadoop/core/hadoop-2.5.2/hadoop-2.5.2.tar.gz'
 
 Driver = get_driver(Provider.OPENSTACK)
 os_conn = Driver(os_user, os_password,
@@ -309,3 +310,19 @@ def start_infinispan_service():
 @parallel
 def stop_infinispan_service():
     sudo("sudo service infinispan-server stop", pty=True)
+    
+@parallel
+def install_hadoop():
+    """
+    """
+    pkg_file_name = hadoop_package_url.split("/")[-1]
+    dir_name = pkg_file_name[:-len('.tar.gz')]    
+
+    if not exists(pkg_file_name):
+        run("wget '{0}' -O {1}".format(hadoop_package_url, pkg_file_name))
+    if not exists(dir_name):
+        run("tar zxvf {0}".format(pkg_file_name))
+     
+        
+        
+    

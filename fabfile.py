@@ -478,6 +478,16 @@ def _hadoop_change_core_site(hadoop_home, master_ip):
         <name>fs.defaultFS</name>
         <value>hdfs://{1}:9000</value>
     </property>
+
+    <property>
+        <name>fs.default.name</name>
+        <value>hdfs://{1}:9000</value>
+    </property>
+
+    <property>
+        <name>mapred.job.tracker</name>
+        <value>{1}:9001</value>
+    </property>
 </configuration>""".format(hadoop_home, master_ip)
 
     filename = 'core-site.xml'
@@ -517,7 +527,7 @@ def _hadoop_change_HDFS_site(hadoop_home, master, replica='1', xcieversmax='1009
     </property>
     <property>
         <name>dfs.data.dir</name>
-        <value>{0}/hdfs/data</value>
+        <value>file://{0}/hdfs/data</value>
     </property>
 
     <property>

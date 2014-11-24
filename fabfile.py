@@ -318,7 +318,7 @@ def deploy_additioanl_ssh_keys():
     for k in cluster_additinal_ssh_keys:
         if not contains(authorized_file, k.strip()):
             append(authorized_file, "\n")
-            append(authorized_file, k)
+            append(authorized_file, k.strip())
 
 
 @parallel

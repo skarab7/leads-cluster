@@ -1,6 +1,7 @@
 from fabric.contrib.files import exists, append, contains
+from fabric.contrib import files
 from fabric.api import run, env, sudo, local, cd
-from fabric.api import hide, parallel
+from fabric.api import hide, parallel, roles, hosts
 import os
 from pipes import quote
 
@@ -59,6 +60,17 @@ infinispan_package_url = 'https://object-hamm5.cloudandheat.com:8080/'\
                          'temp_url_expires=1419376046'
 
 hadoop_package_url = 'https://archive.apache.org/dist/hadoop/core/hadoop-2.5.2/hadoop-2.5.2.tar.gz'
+
+hadoop_master_node_id = _get_env_value("LEADS_CLUSTER_HADOOP_MASTER_NODE_ID", 0)
+hadoop_master_node = node_name_prefix + "_" + str(hadoop_master_node_id)
+hadoop_slave_node_ids = _get_env_array("LEADS_CLUSTER_HADOOP_SLAVE_NODE_IDS", [1], ",")
+hadoop_slave_nodes = [node_name_prefix + "_" + str(s) for s in hadoop_slave_node_ids]
+
+env.roledefs = {
+    'masters': [hadoop_master_node],
+    'slaves': hadoop_slave_nodes
+}
+
 
 Driver = get_driver(Provider.OPENSTACK)
 os_conn = Driver(os_user, os_password,
@@ -332,3 +344,35 @@ def install_hadoop():
         run("wget '{0}' -O {1}".format(hadoop_package_url, pkg_file_name))
     if not exists(dir_name):
         run("tar zxvf {0}".format(pkg_file_name))
+
+    crawler_home = "/home/ubuntu/{0}".format(dir_name)
+    _hadoop_heap_configure(crawler_home)
+
+
+# fabric roles works only on env.host
+# for us it is simplier to use env.host_string
+def roles_host_string_based(*args):
+    supported_roles = args
+
+    def new_decorator(func):
+        def func_wrapper(*args, **kwargs):
+            for role in supported_roles:
+                role_hosts = [r[1] for r in env.roledefs.items() if r[0] == role][0]
+                if env.host_string in role_hosts:
+                    func(*args, **kwargs)
+        return func_wrapper
+    return new_decorator
+
+
+@roles_host_string_based('masters')
+def _hadoop_heap_configure(crawler_home, new_heap_size=1000, old_heap_size=2000):
+    """
+    Le Quoc Do - SE Group TU Dresden contribution
+    """
+    filename = crawler_home + '/etc/hadoop/hadoop-env.sh'
+    before = 'HADOOP_HEAPSIZE=' + str(new_heap_size)
+    after = 'HADOOP_HEAPSIZE=' + str(old_heap_size)
+    files.sed(filename, before, after, limit='')
+    files.uncomment(filename, 'HADOOP_HEAPSIZE')
+
+

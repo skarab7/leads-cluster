@@ -344,6 +344,7 @@ def deploy_additioanl_ssh_keys():
             append(authorized_file, k.strip())
 
 
+@roles_host_string_based('masters', 'slaves')
 @parallel
 def install_hadoop():
     """
@@ -585,22 +586,11 @@ def _hadoop_prepare_etc_host():
             files.append('/etc/hosts', entry, use_sudo=True)
 
 
-@roles('masters')
-def hadoop_format():
-    hadoop_home = _get_hadoop_home()
-
-    with settings(warn_only=True):
-        with cd(hadoop_home):
-            with shell_env(JAVA_HOME='/usr/lib/jvm/java-7-openjdk-amd64',
-                           HADOOP_PREFIX=hadoop_home):
-                run('echo "Y" | bin/hdfs namenode -format')
-                run('bin/hdfs datanode -regular')
-
-
 def _get_hadoop_home():
     return "/home/ubuntu/{0}".format(_get_hadoop_name(hadoop_package_url))
 
 
+@roles_host_string_based('masters', 'slaves')
 @serial
 def start_hadoop_service():
     """
@@ -661,3 +651,15 @@ def stop_hadoop_service():
     _hadoop_command_datanode("stop")
     _hadoop_command_resource_mgmt("stop")
     _hadoop_command_node_manager("stop")
+
+
+@roles_host_string_based('masters')
+def hadoop_format():
+    hadoop_home = _get_hadoop_home()
+
+    with settings(warn_only=True):
+        with cd(hadoop_home):
+            with shell_env(JAVA_HOME='/usr/lib/jvm/java-7-openjdk-amd64',
+                           HADOOP_PREFIX=hadoop_home):
+                run('echo "Y" | bin/hdfs namenode -format')
+                run('bin/hdfs datanode -regular')

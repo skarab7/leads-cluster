@@ -49,6 +49,8 @@ Structure: The name of a scenario and the corresponding version of the leads-clu
    |         A        |              |         B        |
     ------------------                ------------------
 
+- Move to coreos + docker (3.0.0)
+
 How to use it
 -----------------
 

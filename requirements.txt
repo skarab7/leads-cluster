@@ -6,3 +6,4 @@ ecdsa
 apache-libcloud
 python-swiftclient
 python-keystoneclient
+prettytable

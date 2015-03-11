@@ -9,6 +9,7 @@ import os
 from libcloud.compute.types import Provider
 from libcloud.compute.providers import get_driver
 import libcloud.security
+from prettytable import PrettyTable
 
 
 def _get_env_value(env_name, default_value):
@@ -89,6 +90,21 @@ os_conn = Driver(os_user, os_password,
                  ex_force_auth_version='2.0_password')
 
 libcloud.security.VERIFY_SSL_CERT = False
+
+
+# fabric roles works only on env.host
+# for us it is simplier to use env.host_string
+def roles_host_string_based(*args):
+    supported_roles = args
+
+    def new_decorator(func):
+        def func_wrapper(*args, **kwargs):
+            for role in supported_roles:
+                role_hosts = [r[1] for r in env.roledefs.items() if r[0] == role][0]
+                if env.host_string in role_hosts:
+                    func(*args, **kwargs)
+        return func_wrapper
+    return new_decorator
 
 
 def create_cluster():
@@ -392,21 +408,6 @@ def get_node_private_ip(node_name):
         return node.private_ips[0]
 
 
-# fabric roles works only on env.host
-# for us it is simplier to use env.host_string
-def roles_host_string_based(*args):
-    supported_roles = args
-
-    def new_decorator(func):
-        def func_wrapper(*args, **kwargs):
-            for role in supported_roles:
-                role_hosts = [r[1] for r in env.roledefs.items() if r[0] == role][0]
-                if env.host_string in role_hosts:
-                    func(*args, **kwargs)
-        return func_wrapper
-    return new_decorator
-
-
 @roles_host_string_based('masters', 'slaves')
 def _hadoop_heap_configure(hadoop_home, new_heap_size=1000, old_heap_size=2000):
     """
@@ -663,3 +664,18 @@ def hadoop_format():
                            HADOOP_PREFIX=hadoop_home):
                 run('echo "Y" | bin/hdfs namenode -format')
                 run('bin/hdfs datanode -regular')
+
+
+def show_running_leads_clusters():
+    """
+    """
+    x = PrettyTable(["Cluster name", "Node name", "Node UUID"])
+    for inst in os_conn.list_nodes():
+        md = os_conn.ex_get_metadata(inst)
+        if "leads_cluster_name" in md:
+            row = []
+            row.append(md["leads_cluster_name"])
+            row.append(inst.name)
+            row.append(inst.id)
+            x.add_row(row)
+    print x

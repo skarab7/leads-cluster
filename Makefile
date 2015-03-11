@@ -57,6 +57,8 @@ swift_repo_get_temp_url_infinispan_package:
 	swift --os-project-name $(INFINISPAN_ARCHIVE_TENANT) --os-auth-url $(INFINISPAN_ARCHIVE_AUTH_URL) \
 	tempurl GET $$(echo '$(VALIDITY_OF_TEMPURL_SEC)' | bc) $(INFINISPAN_ARCHIVE_OBJECT)  $(SWIFT_TEMPURL_KEY) | xargs -I {} echo $(INFINISPAN_ARCHIVE_SWIFT_ENDPOINT){}
 
+show_running_leads_cluster:
+	fab show_running_leads_clusters
 
 
 

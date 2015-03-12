@@ -1,3 +1,4 @@
+==================
 LEADS cluster
 ==================
 
@@ -8,7 +9,7 @@ This project is based on: https://github.com/otrack/Leads-deployment.git. A proj
 **Main git repo is https://github.com/skarab7/leads-cluster.git.**
 
 Scenario
---------------
+==========
 
 Structure: The name of a scenario and the corresponding version of the leads-cluster:
 
@@ -52,12 +53,12 @@ Structure: The name of a scenario and the corresponding version of the leads-clu
 - Move to coreos + docker (3.0.0)
 
 How to use it
------------------
+================
 
 *Makefile* is the entry point for this project.
 
 Workflow
-~~~~~~~~~~~
+------------
 
 :: 
 
@@ -66,7 +67,7 @@ Workflow
     -> [install LEADS from container] -> [configure] -> [start services]
 
 Tasks
-~~~~~~~~~~~~~~~
+------------
 
 Please use virutalenv and virtualenvwrapper to manage your python libraries.
 
@@ -133,6 +134,12 @@ Please use virutalenv and virtualenvwrapper to manage your python libraries.
   
     make cluster_start_infinispan
 
+  You can check whether it works with:
+
+  .. code:: bash
+
+
+
 5. Stop infinispan 
  
   In parallel, the infinispan service is started on all the cluster nodes
@@ -174,8 +181,32 @@ Please use virutalenv and virtualenvwrapper to manage your python libraries.
     make cluster_stop_hadoop
 
 
+Providing software artifacts
+---------------------------------
+
+We share all the binaries with swift container (see *helpers*)
+
+:: 
+          
+            ------------------ 
+           | swift container  |
+       --> |                  | -
+      /     ------------------    \ 
+      |                           |
+      |                           |
+    upload                        |
+      |                          \/
+  -------------              fabric deploy
+ |   compile   |
+ |   & build   | 
+  -------------
+ | workstation |
+ |             |
+  -------------
+
 Helpers
-~~~~~~~~~~~~~~~
+------------
+
 
 1. Deploying new infinispan archive
     

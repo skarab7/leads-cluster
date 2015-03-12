@@ -6,7 +6,7 @@ The project goal is to provide an easy way to setup a cluster for FP7 EU LEADS p
 
 This project is based on: https://github.com/otrack/Leads-deployment.git. A project created and maintained by Pierre Sutra.
 
-**Main git repo is https://github.com/skarab7/leads-cluster.git.**
+**Main git repo is https://github.com/leads-project/leads-cluster.git.**
 
 Scenario
 ==========

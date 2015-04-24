@@ -2,11 +2,11 @@
 LEADS cluster
 ==================
 
-**DEPRECETED** 
+**Deprecated** 
 
 Please use https://github.com/skarab7/leads_query-engine
 
-**DEPRECETED**
+**Deprecated**
 
 The project goal is to provide an easy way to setup a cluster for FP7 EU LEADS project (http://www.leads-project.eu). 
 

@@ -10,6 +10,7 @@ INFINISPAN_ARCHIVE_SWIFT_ENDPOINT=https://object-hamm5.cloudandheat.com:8080
 # default value 30 days
 VALIDITY_OF_TEMPURL_SEC=24*60*60*30
 
+_SSH_CONFIG_FILE=cluster_ssh_config
 
 ####
 # virtualenv initialization 
@@ -24,13 +25,27 @@ cluster_create:
 	fab create_cluster
 
 cluster_install_infinispan:
-	fab -H $$(<cluster_hosts) install_infinispan --ssh-config-path=cluster_ssh_config
+	fab -H $$(<cluster_hosts) install_infinispan --ssh-config-path=$(_SSH_CONFIG_FILE)
 
 cluster_start_infinispan:
-	fab -H $$(<cluster_hosts) start_infinispan_service --ssh-config-path=cluster_ssh_config	
+	fab -H $$(<cluster_hosts) start_infinispan_service --ssh-config-path=$(_SSH_CONFIG_FILE)	
 
 cluster_stop_infinispan:
-	fab -H $$(<cluster_hosts) stop_infinispan_service --ssh-config-path=cluster_ssh_config	
+	fab -H $$(<cluster_hosts) stop_infinispan_service --ssh-config-path=$(_SSH_CONFIG_FILE)	
+
+cluster_install_hadoop:
+	fab -H $$(<cluster_hosts) install_hadoop --ssh-config-path=cluster_ssh_config
+
+cluster_start_hadoop:
+	fab -H $$(<cluster_hosts) start_hadoop_service  --ssh-config-path=cluster_ssh_config
+
+cluster_stop_hadoop:
+	fab -H $$(<cluster_hosts) stop_hadoop_service  --ssh-config-path=cluster_ssh_config
+
+# export LEADS_CLUSTER_ADD_SSH_KEYS="$(<id_rsa.pub)"
+deploy_additional_keys:
+	if [ -z $${LEADS_CLUSTER_ADD_SSH_KEYS} ]; then echo "The environment variable LEADS_CLUSTER_ADD_SSH_KEYS must be set"; exit 1; fi; \
+	fab -H $$(<cluster_hosts) deploy_additioanl_ssh_keys --ssh-config-path=$(_SSH_CONFIG_FILE)	
 
 # You can geneate the key with openssl
 # export MY_SECRET_KEY=$(openssl rand -hex 16)
@@ -42,7 +57,8 @@ swift_repo_get_temp_url_infinispan_package:
 	swift --os-project-name $(INFINISPAN_ARCHIVE_TENANT) --os-auth-url $(INFINISPAN_ARCHIVE_AUTH_URL) \
 	tempurl GET $$(echo '$(VALIDITY_OF_TEMPURL_SEC)' | bc) $(INFINISPAN_ARCHIVE_OBJECT)  $(SWIFT_TEMPURL_KEY) | xargs -I {} echo $(INFINISPAN_ARCHIVE_SWIFT_ENDPOINT){}
 
-other:
-	echo "ww"
+show_running_leads_cluster:
+	fab show_running_leads_clusters
+
 
 

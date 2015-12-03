@@ -4,7 +4,7 @@ LEADS cluster
 
 **Deprecated** 
 
-Please use https://github.com/skarab7/leads_query-engine
+Please use https://github.com/leads-project/leads_query-engine
 
 **Deprecated**
 
